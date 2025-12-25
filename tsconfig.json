@@ -1,0 +1,24 @@
+{
+	"compilerOptions": {
+		"baseUrl": "src",
+		"target": "ESNext",
+		"lib": [
+			"ESNext"
+		],
+		"module": "NodeNext",
+		"outDir": "dist",
+		"rootDir": "src",
+		"strict": true,
+		"esModuleInterop": true,
+		"skipLibCheck": true,
+		"sourceMap": true,
+		"types": [
+			"node",
+			"vitest/globals",
+			"vite/client"
+		]
+	},
+	"include": [
+		"src"
+	]
+}
