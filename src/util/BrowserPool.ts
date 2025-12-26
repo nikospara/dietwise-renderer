@@ -8,12 +8,15 @@ export class BrowserPool {
 
 	async init() {
 		for (let i = 0; i < this.size; i++) {
-			const browser = await chromium.launch({
-				headless: true,
-				args: ['--disable-dev-shm-usage', '--no-sandbox'],
-			});
-			this.browsers.push(browser);
+			this.browsers.push(await this.launch());
 		}
+	}
+
+	private async launch(): Promise<Browser> {
+		return chromium.launch({
+			headless: true,
+			args: ['--disable-dev-shm-usage', '--no-sandbox'],
+		});
 	}
 
 	acquire(): Browser {
@@ -21,6 +24,17 @@ export class BrowserPool {
 		const browser = this.browsers[this.index];
 		this.index = (this.index + 1) % this.browsers.length;
 		return browser;
+	}
+
+	async replace(dead: Browser) {
+		const index = this.browsers.indexOf(dead);
+		if (index === -1) return;
+		try {
+			await dead.close();
+		} catch (_) {
+			/* empty */
+		}
+		this.browsers[index] = await this.launch();
 	}
 
 	async shutdown() {

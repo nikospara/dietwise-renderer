@@ -5,12 +5,13 @@ import { createApp } from './app.js';
 const port = Number(process.env.PORT ?? 3000);
 const browserCount = Number(process.env.BROWSER_COUNT ?? 2); // Chromium processes
 const maxConcurrentJobs = Number(process.env.MAX_CONCURRENT_JOBS ?? 4); // Pages total
+const HARD_TIMEOUT_MS = 20000;
 
 const browserPool = new BrowserPool(browserCount);
 const semaphore = new Semaphore(maxConcurrentJobs);
 await browserPool.init();
 
-const app = createApp(browserPool, semaphore);
+const app = createApp(browserPool, semaphore, { hardTimeoutMs: HARD_TIMEOUT_MS });
 
 process.on('SIGTERM', async () => {
 	await browserPool.shutdown();
