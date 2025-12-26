@@ -24,6 +24,8 @@ export class BrowserPool {
 	}
 
 	async shutdown() {
-		await Promise.all(this.browsers.map((b) => b.close()));
+		await Promise.all(
+			this.browsers.map((b, index) => b.close().catch((e) => console.error(`Error closing browser ${index}`, e))),
+		);
 	}
 }

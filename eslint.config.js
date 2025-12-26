@@ -33,13 +33,13 @@ export default defineConfig(
 				},
 			],
 			'import/order': [
-				'warn',
+				'off',
 				{
-					'newlines-between': 'always',
-					alphabetize: {
-						order: 'asc',
-						caseInsensitive: true,
-					},
+//					'newlines-between': 'always',
+//					alphabetize: {
+//						order: 'asc',
+//						caseInsensitive: true,
+//					},
 				},
 			],
 		},
