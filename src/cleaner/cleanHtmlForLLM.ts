@@ -79,10 +79,21 @@ export interface PageCleaningResult {
 	stats: Record<string, number>;
 }
 
+/** Adapter so this can parse HTML in browser or server. */
+export interface HtmlToDocumentAdapter {
+	parse(html: string): Document;
+}
+
 export function cleanHtmlForLLM(
 	html: string,
 	options?: Partial<CleanOptions>,
+	adapter: HtmlToDocumentAdapter,
 ): PageCleaningResult {
+	const doc = adapter.parse(html);
+	return cleanDocumentForLLM(doc, options);
+}
+
+export function cleanDocumentForLLM(doc: Document, options?: Partial<CleanOptions>): PageCleaningResult {
 	const opts: CleanOptions = {
 		allowedTags: new Set(DEFAULT_ALLOWED_TAGS),
 		dropMedia: true,
@@ -93,24 +104,24 @@ export function cleanHtmlForLLM(
 	};
 	if (opts.keepTables) TABLE_TAGS.forEach((t) => opts.allowedTags.add(t));
 
-	const parser = new DOMParser();
-	// Use text/html to auto-create <html><body> wrappers
-	const doc = parser.parseFromString(html, 'text/html');
 	const body = doc.body;
-
 	const stats: Record<string, number> = {
 		removedNodes: 0,
 		unwrappedNodes: 0,
 		removedAttrs: 0,
 		strippedLinks: 0,
 		emptyNodes: 0,
+		removedComments: 0,
 	};
 
 	// Never unwrap these
 	(opts.allowedTags as Set<string>).add('html');
 	(opts.allowedTags as Set<string>).add('body');
 
-	// 1) Drop obvious noise
+	// 0) Remove comments (portable, no TreeWalker)
+	stats.removedComments += removeComments(body);
+
+	// 1) Drop obvious noise (selectors are fine across jsdom/linkedom/browsers)
 	body.querySelectorAll(
 		'script, style, noscript, template, iframe, frame, frameset, object, embed, form, input, textarea, select, button, svg, canvas, picture, source, meta, link, header, footer, nav, aside, share, ads, [aria-hidden="true"]',
 	).forEach((n) => {
@@ -118,12 +129,12 @@ export function cleanHtmlForLLM(
 		stats.removedNodes++;
 	});
 
-	if (opts.dropMedia)
+	if (opts.dropMedia) {
 		body.querySelectorAll('img, video, audio, figure').forEach((n) => {
 			n.remove();
 			stats.removedNodes++;
 		});
-	else {
+	} else {
 		// If media kept, still remove video/audio/figure (unless explicitly allowed via allowedTags)
 		body.querySelectorAll('video, audio, figure').forEach((n) => {
 			if (!opts.allowedTags.has(n.tagName.toLowerCase())) {
