@@ -21,6 +21,7 @@
   "dependencies": {
     "async-mutex": "^0.5.0",
     "express": "^5.2.1",
+    "linkedom": "^0.18.12",
     "playwright": "^1.57.0"
   },
   "devDependencies": {
