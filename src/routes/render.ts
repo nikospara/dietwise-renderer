@@ -1,10 +1,10 @@
 import type { Router } from 'express';
 import { Router as createRouter } from 'express';
-import type { BrowserPool } from 'util/BrowserPool.js';
-import type { Semaphore } from 'util/Semaphore.js';
-import type { Config } from 'model.js';
+import type { BrowserPool } from 'app/util/BrowserPool.js';
+import type { Semaphore } from 'app/util/Semaphore.js';
+import type { Config } from 'app/model.js';
 import type { BrowserContext, Page } from 'playwright';
-import { withHardTimeout } from 'util/withHardTimeout.js';
+import { withHardTimeout } from 'app/util/withHardTimeout.js';
 
 export const CANONICAL_PROFILE = {
 	userAgent:

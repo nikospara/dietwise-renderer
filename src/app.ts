@@ -1,9 +1,9 @@
 import express from 'express';
-import { healthRouter } from 'routes/health.js';
-import { renderRouter } from 'routes/render.js';
-import type { BrowserPool } from 'util/BrowserPool.js';
-import type { Semaphore } from 'util/Semaphore.js';
-import type { Config } from 'model.js';
+import { healthRouter } from 'app/routes/health.js';
+import { renderRouter } from 'app/routes/render.js';
+import type { BrowserPool } from 'app/util/BrowserPool.js';
+import type { Semaphore } from 'app/util/Semaphore.js';
+import type { Config } from 'app/model.js';
 
 export function createApp(browserPool: BrowserPool, semaphore: Semaphore, config: Config) {
 	const app = express();

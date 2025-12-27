@@ -1,6 +1,6 @@
-import { BrowserPool } from 'util/BrowserPool.js';
-import { Semaphore } from 'util/Semaphore.js';
-import { createApp } from './app.js';
+import { BrowserPool } from 'app/util/BrowserPool.js';
+import { Semaphore } from 'app/util/Semaphore.js';
+import { createApp } from 'app/app.js';
 
 const port = Number(process.env.PORT ?? 3000);
 const browserCount = Number(process.env.BROWSER_COUNT ?? 2); // Chromium processes
