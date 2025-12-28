@@ -99,7 +99,7 @@ export function cleanDocumentForLLM(doc: Document, options?: Partial<CleanOption
 		dropMedia: true,
 		strictUrls: true,
 		keepTables: false,
-		maxDepth: 2000,
+		maxDepth: 200000,
 		...options,
 	};
 	if (opts.keepTables) TABLE_TAGS.forEach((t) => opts.allowedTags.add(t));
@@ -180,7 +180,7 @@ export function cleanDocumentForLLM(doc: Document, options?: Partial<CleanOption
 
 	while (queue.length && processed++ < opts.maxDepth) {
 		const node = queue.shift()!;
-		if (node.nodeType === Node.ELEMENT_NODE) {
+		if (node.nodeType === 1 /* Node.ELEMENT_NODE*/) {
 			const el = node as Element;
 			const moved = unwrapIfNeeded(el);
 			if (moved) {
@@ -308,10 +308,10 @@ export function cleanDocumentForLLM(doc: Document, options?: Partial<CleanOption
 	];
 	for (const tag of blockTags) {
 		body.querySelectorAll(tag).forEach((el) => {
-			if (el.firstChild && el.firstChild.nodeType !== Node.TEXT_NODE) {
+			if (el.firstChild && el.firstChild.nodeType !== 3 /* Node.TEXT_NODE */) {
 				el.insertBefore(doc.createTextNode('\n'), el.firstChild);
 			}
-			if (el.lastChild && el.lastChild.nodeType !== Node.TEXT_NODE) {
+			if (el.lastChild && el.lastChild.nodeType !== 3 /* Node.TEXT_NODE */) {
 				el.appendChild(doc.createTextNode('\n'));
 			}
 		});

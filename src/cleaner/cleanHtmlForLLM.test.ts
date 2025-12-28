@@ -3,6 +3,8 @@
 import { describe, it, expect } from 'vitest';
 import { cleanHtmlForLLM, HtmlToDocumentAdapter, DEFAULT_ALLOWED_TAGS } from './cleanHtmlForLLM.js';
 import { nodeDomAdapter } from './nodeDomAdapter.js';
+import fs from 'node:fs';
+import path from 'node:path';
 
 // --- helpers ---------------------------------------------------------------
 
@@ -220,5 +222,12 @@ describe('cleanHtmlForLLM', () => {
 		// Should still contain a <br> representing the explicit break
 		expect(/<br>/i.test(html)).toBe(true);
 		expect(normalizeForAssert(html)).toBe('Line 1 Line 2');
+	});
+
+	it('cleans a real-life scenario', () => {
+		const input = fs.readFileSync(path.resolve(__dirname, '../../tests/cleaner/test.html'), 'utf8');
+		const { html } = cleanHtmlForLLM(input, domAdapter);
+		expect(html.length).toBeGreaterThan(1000);
+		expect(html.length).toBeLessThan(input.length);
 	});
 });

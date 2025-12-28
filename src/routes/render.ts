@@ -5,6 +5,8 @@ import type { Semaphore } from 'app/util/Semaphore.js';
 import type { Config } from 'app/model.js';
 import type { BrowserContext, Page } from 'playwright';
 import { withHardTimeout } from 'app/util/withHardTimeout.js';
+import { cleanHtmlForLLM, PageCleaningResult, RECIPE_MINIMAL_TAGS } from 'app/cleaner/cleanHtmlForLLM.js';
+import { nodeDomAdapter } from 'app/cleaner/nodeDomAdapter.js';
 
 export const CANONICAL_PROFILE = {
 	userAgent:
@@ -26,6 +28,7 @@ export interface Viewport {
 
 export interface RenderRequest {
 	url: string;
+	simplify?: boolean;
 	timeout?: number;
 	viewport?: Viewport;
 }
@@ -58,6 +61,7 @@ export function renderRouter(browserPool: BrowserPool, semaphore: Semaphore, con
 		try {
 			const renderRequest: RenderRequest = {
 				url: req.body.url,
+				simplify: req.body.simplify,
 				timeout: req.body.timeout,
 				viewport: req.body.viewport,
 			};
@@ -110,7 +114,15 @@ export function renderRouter(browserPool: BrowserPool, semaphore: Semaphore, con
 				await browserPool.replace(browser);
 			};
 
-			const result = await withHardTimeout(task, config.hardTimeoutMs, hardTimeout);
+			let result = await withHardTimeout(task, config.hardTimeoutMs, hardTimeout);
+
+			if (renderRequest.simplify) {
+				const pass1 = cleanHtml(result.html);
+				result = {
+					...result,
+					html: pass1.html,
+				};
+			}
 
 			res.json(result);
 		} catch (err) {
@@ -142,4 +154,12 @@ function normalizeViewport(vp?: Viewport): Viewport {
 		width: Math.min(Math.max(vp.width, 320), 1440),
 		height: Math.min(Math.max(vp.height, 480), 2000),
 	};
+}
+
+function cleanHtml(html: string): PageCleaningResult {
+	return cleanHtmlForLLM(html, nodeDomAdapter, {
+		allowedTags: new Set(RECIPE_MINIMAL_TAGS),
+		keepTables: false,
+		dropMedia: true,
+	});
 }
