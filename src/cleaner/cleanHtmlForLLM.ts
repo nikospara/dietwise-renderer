@@ -13,6 +13,7 @@
  * Usage: `const { html } = cleanHtmlForLLM(rawHtml);`
  * The resulting `html` is tiny, readable, and ready to ship to the server/LLM.
  */
+import { removeConsentUI } from './removeConsentUI.js';
 
 export interface CleanOptions {
 	/** Allowed tags that will be preserved; all others are unwrapped (children kept). */
@@ -25,6 +26,8 @@ export interface CleanOptions {
 	keepTables: boolean;
 	/** Maximum depth to process to avoid pathological DOMs. */
 	maxDepth: number;
+	/** Apply heuristics to try and clean consent UI elements. */
+	applyConsentUiHeuristics: boolean;
 }
 
 export interface DomAdapter {
@@ -100,6 +103,7 @@ export function cleanDocumentForLLM(doc: Document, options?: Partial<CleanOption
 		strictUrls: true,
 		keepTables: false,
 		maxDepth: 200000,
+		applyConsentUiHeuristics: true,
 		...options,
 	};
 	if (opts.keepTables) TABLE_TAGS.forEach((t) => opts.allowedTags.add(t));
@@ -112,7 +116,12 @@ export function cleanDocumentForLLM(doc: Document, options?: Partial<CleanOption
 		strippedLinks: 0,
 		emptyNodes: 0,
 		removedComments: 0,
+		removedConsentNodes: 0,
 	};
+
+	if (opts.applyConsentUiHeuristics) {
+		removeConsentUI(doc);
+	}
 
 	// Never unwrap these
 	(opts.allowedTags as Set<string>).add('html');

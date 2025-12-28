@@ -111,6 +111,7 @@ export function renderRouter(browserPool: BrowserPool, semaphore: Semaphore, con
 					// Intentionally blank
 				}
 				if (context) await closeContext(context);
+				context = null;
 				await browserPool.replace(browser);
 			};
 

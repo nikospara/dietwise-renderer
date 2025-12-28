@@ -230,4 +230,10 @@ describe('cleanHtmlForLLM', () => {
 		expect(html.length).toBeGreaterThan(1000);
 		expect(html.length).toBeLessThan(input.length);
 	});
+
+	it('cleans a real-life scenario (2 - consent)', () => {
+		const input = fs.readFileSync(path.resolve(__dirname, '../../tests/cleaner/test2.html'), 'utf8');
+		const { html } = cleanHtmlForLLM(input, domAdapter);
+		expect(html).toBe('<p>Some real content</p><br><p>Some more real content.</p>');
+	});
 });
