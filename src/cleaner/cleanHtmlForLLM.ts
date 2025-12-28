@@ -86,8 +86,8 @@ export interface HtmlToDocumentAdapter {
 
 export function cleanHtmlForLLM(
 	html: string,
-	options?: Partial<CleanOptions>,
 	adapter: HtmlToDocumentAdapter,
+	options?: Partial<CleanOptions>,
 ): PageCleaningResult {
 	const doc = adapter.parse(html);
 	return cleanDocumentForLLM(doc, options);
@@ -174,9 +174,10 @@ export function cleanDocumentForLLM(doc: Document, options?: Partial<CleanOption
 		return moved;
 	};
 
-	// Tree walk breadth-first with a depth guard to strip attributes
+	// Tree walk breadth-first to strip attributes; with a guard against processing too many elements TODO rename opts.maxDepth
 	const queue: Node[] = [body];
 	let processed = 0;
+
 	while (queue.length && processed++ < opts.maxDepth) {
 		const node = queue.shift()!;
 		if (node.nodeType === Node.ELEMENT_NODE) {
@@ -192,6 +193,7 @@ export function cleanDocumentForLLM(doc: Document, options?: Partial<CleanOption
 			// 3) Remove attributes, with special cases for <a> and <img>
 			let keptHref = false;
 			let keptSrc = false;
+
 			for (const attr of Array.from(el.attributes)) {
 				const name = attr.name.toLowerCase();
 				if (tag === 'a' && name === 'href') {
@@ -225,7 +227,7 @@ export function cleanDocumentForLLM(doc: Document, options?: Partial<CleanOption
 
 			// Post-attr enforcement per rules
 			if (tag === 'a' && !keptHref) {
-				// unwrap <a> but keep its children/text
+				// If <a> has no href,unwrap it but keep its children/text
 				const parent = el.parentNode;
 				if (parent) {
 					while (el.firstChild) {
@@ -237,6 +239,8 @@ export function cleanDocumentForLLM(doc: Document, options?: Partial<CleanOption
 				}
 			}
 			if (tag === 'img') {
+				// If <img> isn't allowed or has no src, remove it.
+				// (Also: if it was allowed but attributes got stripped, this catches it.)
 				if (!opts.allowedTags.has('img') || !keptSrc) {
 					el.remove();
 					stats.removedNodes++;
@@ -260,38 +264,27 @@ export function cleanDocumentForLLM(doc: Document, options?: Partial<CleanOption
 		if (tag === 'img') {
 			return opts.allowedTags.has('img') && !!el.getAttribute('src');
 		}
-		const txt = el.textContent?.replace(/[\u200B\u200C\u200D]/g, '').trim() || '';
+		const txt = (el.textContent || '').replace(/[\u200B\u200C\u200D]/g, '').trim();
 		return txt.length > 0;
 	};
 
-	// Post-order traversal to safely remove
-	const walker = doc.createTreeWalker(body, NodeFilter.SHOW_ELEMENT);
-	const stack: Element[] = [];
-	while (walker.nextNode()) stack.push(walker.currentNode as Element);
-	for (let i = stack.length - 1; i >= 0; i--) {
-		const el = stack[i];
-		if (!opts.allowedTags.has(el.tagName.toLowerCase())) continue; // non-whitelisted already unwrapped
+	// Portable post-order: collect all elements then traverse in reverse
+	const allEls = collectElements(body, opts.maxDepth);
+	for (let i = allEls.length - 1; i >= 0; i--) {
+		const el = allEls[i];
+		if (!opts.allowedTags.has(el.tagName.toLowerCase())) continue; // already unwrapped
 		if (!isMeaningful(el)) {
 			el.remove();
 			stats.emptyNodes++;
 		}
 	}
 
-	// 4a) Remove comments
-	const commentsWalker = doc.createTreeWalker(body, NodeFilter.SHOW_COMMENT);
-	const commentNodes: Comment[] = [];
-	while (commentsWalker.nextNode()) {
-		commentNodes.push(commentsWalker.currentNode as Comment);
-	}
-	for (const c of commentNodes) {
-		c.parentNode?.removeChild(c);
-	}
+	// 4a) Remove comments (unwrapping can move comment nodes around)
+	stats.removedComments += removeComments(body);
 
 	// 5) Whitespace normalization
 	// Convert <br> to newline tokens to help later collapse, then restore
-	body.querySelectorAll('br').forEach((br) =>
-		br.replaceWith(doc.createTextNode('\n')),
-	);
+	body.querySelectorAll('br').forEach((br) => br.replaceWith(doc.createTextNode('\n')));
 
 	// Insert newlines around block-level tags so collapsing whitespace keeps structure
 	const blockTags = [
@@ -311,7 +304,7 @@ export function cleanDocumentForLLM(doc: Document, options?: Partial<CleanOption
 		'tr',
 		'th',
 		'td',
-		'div',
+		// NOTE: do NOT include div here; divs should have been unwrapped unless allowed.
 	];
 	for (const tag of blockTags) {
 		body.querySelectorAll(tag).forEach((el) => {
@@ -348,19 +341,24 @@ export function cleanDocumentForLLM(doc: Document, options?: Partial<CleanOption
 	return { html: out, textLength: textLength(out), stats };
 }
 
+// ---------------- helpers ----------------
+
 function sanitizeUrl(raw: string, strict: boolean): string | null {
 	const val = (raw || '').trim();
 	try {
 		const u = new URL(val, 'https://example.invalid');
 		const scheme = u.protocol.replace(':', '');
-		if (!strict) return u.href.replace('https://example.invalid', '');
-		if (scheme === 'http' || scheme === 'https') {
-			return u.href.replace('https://example.invalid', '');
-		}
+
+		// allow relatives by stripping the fake origin
+		const normalized = u.href.replace('https://example.invalid', '');
+
+		if (!strict) return normalized;
+
+		if (scheme === 'http' || scheme === 'https') return normalized;
+
 		// allow relative
-		if (u.origin === 'https://example.invalid') {
-			return u.href.replace('https://example.invalid', '');
-		}
+		if (u.origin === 'https://example.invalid') return normalized;
+
 		return null;
 	} catch {
 		// Bare relatives
@@ -378,6 +376,47 @@ function textLength(html: string): number {
 		.trim().length;
 }
 
+/** Collect elements in document order, portable (no TreeWalker). */
+function collectElements(root: Element, max: number): Element[] {
+	const out: Element[] = [];
+	const stack: Element[] = [root];
+	let seen = 0;
+
+	while (stack.length && seen++ < max) {
+		const el = stack.pop()!;
+		out.push(el);
+
+		// push children in reverse so traversal stays roughly document-order
+		const children = Array.from(el.children) as Element[];
+		for (let i = children.length - 1; i >= 0; i--) stack.push(children[i]);
+	}
+	return out;
+}
+
+/** Remove comment nodes under a root, portable (nodeType 8). */
+function removeComments(root: Element): number {
+	const toRemove: Comment[] = [];
+	const stack: Node[] = [root];
+
+	while (stack.length) {
+		const node = stack.pop()!;
+		if (!node) continue;
+
+		const nt = node.nodeType;
+		if (nt === 8) {
+			toRemove.push(node as Comment);
+			continue;
+		}
+
+		// Only descend if it can have children
+		const children = node.childNodes ? Array.from(node.childNodes as NodeListOf<ChildNode>) : [];
+		for (let i = children.length - 1; i >= 0; i--) stack.push(children[i] as unknown as Node);
+	}
+
+	for (const c of toRemove) c.parentNode?.removeChild(c);
+	return toRemove.length;
+}
+
 // Convenience: minimal whitelist tailored for recipe pages
 export const RECIPE_MINIMAL_TAGS = new Set<string>([
 	'h1',
@@ -393,12 +432,3 @@ export const RECIPE_MINIMAL_TAGS = new Set<string>([
 	'br',
 	'time',
 ]);
-
-// Example convenience wrapper
-export function cleanHtmlMinimal(html: string): PageCleaningResult {
-	return cleanHtmlForLLM(html, {
-		allowedTags: new Set(RECIPE_MINIMAL_TAGS),
-		keepTables: false,
-		dropMedia: true,
-	});
-}
