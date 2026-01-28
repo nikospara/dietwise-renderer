@@ -168,14 +168,15 @@ export function renderRouter(browserPool: BrowserPool, semaphore: Semaphore, con
 			res.json(result);
 		} catch (err) {
 			console.error(`Error rendering ${url}`, err);
+			const errorMessage = String(err);
 			const hasHttpStatus = err && typeof err === 'object' && 'httpStatus' in err;
-			const responseStatus = hasHttpStatus ? 400 : 500;
+			const responseStatus = hasHttpStatus || isNetworkError(errorMessage) ? 400 : 500;
 			const httpStatus =
 				hasHttpStatus && typeof (err as { httpStatus?: unknown }).httpStatus === 'number'
 					? (err as { httpStatus: number }).httpStatus
 					: undefined;
 			const errorBody: { error: string; httpStatus?: number } = {
-				error: String(err),
+				error: errorMessage,
 			};
 			if (httpStatus !== undefined) {
 				errorBody.httpStatus = httpStatus;
@@ -213,4 +214,20 @@ function cleanHtml(html: string): PageCleaningResult {
 		keepTables: false,
 		dropMedia: true,
 	});
+}
+
+function isNetworkError(message: string): boolean {
+	return (
+		message.includes('net::ERR_CONNECTION_REFUSED') ||
+		message.includes('ECONNREFUSED') ||
+		message.includes('net::ERR_NAME_NOT_RESOLVED') ||
+		message.includes('ENOTFOUND') ||
+		message.includes('net::ERR_CONNECTION_TIMED_OUT') ||
+		message.includes('ETIMEDOUT') ||
+		message.includes('net::ERR_CONNECTION_CLOSED') ||
+		message.includes('net::ERR_NETWORK_CHANGED') ||
+		message.includes('net::ERR_ADDRESS_UNREACHABLE') ||
+		message.includes('EHOSTUNREACH') ||
+		message.includes('ENETUNREACH')
+	);
 }
