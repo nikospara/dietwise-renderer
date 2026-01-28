@@ -119,10 +119,18 @@ export function renderRouter(browserPool: BrowserPool, semaphore: Semaphore, con
 				page.on('pageerror', (err) => {
 					console.error('[PAGE ERROR] [${url}]', err);
 				});
-				await page.goto(url, {
+				const response = await page.goto(url, {
 					waitUntil: 'domcontentloaded',
 					timeout: timeout,
 				});
+				if (response) {
+					const status = response.status();
+					if (status >= 400) {
+						const httpError = new Error(`HTTP ${status}`);
+						(httpError as Error & { httpStatus?: number }).httpStatus = status;
+						throw httpError;
+					}
+				}
 				await page.waitForTimeout(1000);
 				return {
 					html: await page.content(),
@@ -160,9 +168,19 @@ export function renderRouter(browserPool: BrowserPool, semaphore: Semaphore, con
 			res.json(result);
 		} catch (err) {
 			console.error(`Error rendering ${url}`, err);
-			res.status(500).json({
+			const hasHttpStatus = err && typeof err === 'object' && 'httpStatus' in err;
+			const responseStatus = hasHttpStatus ? 400 : 500;
+			const httpStatus =
+				hasHttpStatus && typeof (err as { httpStatus?: unknown }).httpStatus === 'number'
+					? (err as { httpStatus: number }).httpStatus
+					: undefined;
+			const errorBody: { error: string; httpStatus?: number } = {
 				error: String(err),
-			});
+			};
+			if (httpStatus !== undefined) {
+				errorBody.httpStatus = httpStatus;
+			}
+			res.status(responseStatus).json(errorBody);
 		} finally {
 			if (context) await closeContext(context);
 			release();
