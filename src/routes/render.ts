@@ -1,5 +1,7 @@
 import type { Router } from 'express';
 import { Router as createRouter } from 'express';
+import fs from 'node:fs/promises';
+import path from 'node:path';
 import type { BrowserPool } from 'app/util/BrowserPool.js';
 import type { Semaphore } from 'app/util/Semaphore.js';
 import type { Config } from 'app/model.js';
@@ -51,7 +53,6 @@ export function renderRouter(browserPool: BrowserPool, semaphore: Semaphore, con
 
 	router.post('/render', async (req, res) => {
 		const release = await semaphore.acquire();
-		const browser = browserPool.acquire();
 
 		let context: BrowserContext | null = null;
 		let page: Page | null;
@@ -70,6 +71,37 @@ export function renderRouter(browserPool: BrowserPool, semaphore: Semaphore, con
 			}
 			url = renderRequest.url;
 			const timeout = renderRequest.timeout || 15000;
+
+			// Test path: the environment variable DW_RENDERER_TEST_DIR points to a test directory and the requested URL is like 123.html
+			const testDir = process.env.DW_RENDERER_TEST_DIR;
+			if (testDir && /^[0-9]{3}\.html$/.test(renderRequest.url)) {
+				const testPath = path.join(testDir, renderRequest.url);
+				try {
+					const html = await fs.readFile(testPath, 'utf8');
+					let result: RenderResponse = {
+						html,
+						finalUrl: renderRequest.url,
+					};
+					if (renderRequest.simplify) {
+						const pass1 = cleanHtml(result.html);
+						result = {
+							...result,
+							html: pass1.html,
+						};
+					}
+					res.json(result);
+					return;
+				} catch (err) {
+					if (err && typeof err === 'object' && 'code' in err && err.code === 'ENOENT') {
+						res.status(404).json({ error: 'HTTP 404' });
+						return;
+					}
+					throw err;
+				}
+			}
+
+			// Real path
+			const browser = browserPool.acquire();
 
 			const task: Promise<RenderResponse> = (async () => {
 				context = await browser.newContext({
