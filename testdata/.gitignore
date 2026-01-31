@@ -1,0 +1,6 @@
+# The content of the HTML files here is protected by copywright, so they are excluded from version control.
+# To download them, make sure the server is running and run, from the root of the project:
+#
+# while IFS=$'\t' read -r FILE URL ARGS; do ./scripts/download.sh $URL > testdata/$FILE; done < testdata/_control.csv
+#
+*.html

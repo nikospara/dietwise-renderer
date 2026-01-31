@@ -7,7 +7,6 @@
 
 # testing
 /coverage
-/testdata
 
 # production
 /dist
