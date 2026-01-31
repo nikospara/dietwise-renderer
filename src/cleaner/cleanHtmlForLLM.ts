@@ -14,6 +14,7 @@
  * The resulting `html` is tiny, readable, and ready to ship to the server/LLM.
  */
 import { documentToMinimalText } from './htmlToMinimalText.js';
+import { getBodyElement } from './getBodyElement.js';
 import { removeConsentUI } from './removeConsentUI.js';
 
 export interface CleanOptions {
@@ -112,7 +113,7 @@ export function cleanDocumentForLLM(doc: Document, options?: Partial<CleanOption
 	};
 	if (opts.keepTables) TABLE_TAGS.forEach((t) => opts.allowedTags.add(t));
 
-	const body = doc.body;
+	const body = getBodyElement(doc);
 	const stats: Record<string, number> = {
 		removedNodes: 0,
 		unwrappedNodes: 0,

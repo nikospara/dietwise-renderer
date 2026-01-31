@@ -1,4 +1,5 @@
 import type { HtmlToDocumentAdapter } from './cleanHtmlForLLM.js';
+import { getBodyElement } from './getBodyElement.js';
 
 export interface MinimalTextOptions {
 	/** Heading style: '#' repeated per level or a fixed prefix. */
@@ -45,7 +46,7 @@ export function htmlToMinimalText(html: string, adapter: HtmlToDocumentAdapter, 
 
 export function documentToMinimalText(doc: Document, options?: MinimalTextOptions): string {
 	const opts: Required<MinimalTextOptions> = { ...DEFAULT_OPTIONS, ...options };
-	const body = doc.body;
+	const body = getBodyElement(doc);
 
 	const lines: string[] = [];
 

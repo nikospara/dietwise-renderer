@@ -58,6 +58,14 @@ describe('cleanHtmlForLLM', () => {
 		expect(output).toBe('<p>Hello</p>');
 	});
 
+	it('avoids linkedom document.body quirk when link appears before <head>', () => {
+		const input =
+			'<!doctype html><html><link rel="stylesheet" href="/x.css"><head><title>x</title></head><body><p>Hello</p></body></html>';
+		const { output, textLength } = cleanHtmlForLLM(input, domAdapter);
+		expect(textLength).toBeGreaterThan(0);
+		expect(output).toBe('<p>Hello</p>');
+	});
+
 	it('strips all attributes except <a href>', () => {
 		const input = wrapInHtml(`
 			<div id="wrap" class="c">

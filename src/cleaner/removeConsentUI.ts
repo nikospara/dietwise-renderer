@@ -1,3 +1,5 @@
+import { getBodyElement } from './getBodyElement.js';
+
 const CONSENT_SELECTORS = [
 	// OneTrust
 	'#onetrust-banner-sdk',
@@ -59,8 +61,7 @@ function scoreConsent(el: Element): number {
  * Remove cookie/consent UI nodes from a DOM before running cleanHtmlForLLM.
  */
 export function removeConsentUI(doc: Document): number {
-	const body = doc.body;
-	if (!body) return 0;
+	const body = getBodyElement(doc);
 
 	const candidates = new Set<Element>();
 	for (const sel of CONSENT_SELECTORS) {
