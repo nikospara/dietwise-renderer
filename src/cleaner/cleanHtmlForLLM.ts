@@ -13,6 +13,7 @@
  * Usage: `const { html } = cleanHtmlForLLM(rawHtml);`
  * The resulting `html` is tiny, readable, and ready to ship to the server/LLM.
  */
+import { documentToMinimalText } from './htmlToMinimalText.js';
 import { removeConsentUI } from './removeConsentUI.js';
 
 export interface CleanOptions {
@@ -28,6 +29,8 @@ export interface CleanOptions {
 	maxDepth: number;
 	/** Apply heuristics to try and clean consent UI elements. */
 	applyConsentUiHeuristics: boolean;
+	/** Output minimal text (see `htmlToMinimalText). */
+	outputMinimalText: boolean;
 }
 
 export interface DomAdapter {
@@ -77,7 +80,7 @@ export const TABLE_TAGS = [
 ] as const;
 
 export interface PageCleaningResult {
-	html: string;
+	output: string;
 	textLength: number;
 	stats: Record<string, number>;
 }
@@ -104,6 +107,7 @@ export function cleanDocumentForLLM(doc: Document, options?: Partial<CleanOption
 		keepTables: false,
 		maxDepth: 200000,
 		applyConsentUiHeuristics: true,
+		outputMinimalText: false,
 		...options,
 	};
 	if (opts.keepTables) TABLE_TAGS.forEach((t) => opts.allowedTags.add(t));
@@ -291,6 +295,11 @@ export function cleanDocumentForLLM(doc: Document, options?: Partial<CleanOption
 	// 4a) Remove comments (unwrapping can move comment nodes around)
 	stats.removedComments += removeComments(body);
 
+	if (opts.outputMinimalText) {
+		const minimalText = documentToMinimalText(doc);
+		return { output: minimalText, textLength: textLength(minimalText), stats };
+	}
+
 	// 5) Whitespace normalization
 	// Convert <br> to newline tokens to help later collapse, then restore
 	body.querySelectorAll('br').forEach((br) => br.replaceWith(doc.createTextNode('\n')));
@@ -347,7 +356,7 @@ export function cleanDocumentForLLM(doc: Document, options?: Partial<CleanOption
 	// Cosmetic: ensure list items are on their own lines
 	out = out.replace(/<li>/g, '\n<li>').trim();
 
-	return { html: out, textLength: textLength(out), stats };
+	return { output: out, textLength: textLength(out), stats };
 }
 
 // ---------------- helpers ----------------

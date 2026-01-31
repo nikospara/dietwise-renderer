@@ -33,6 +33,7 @@ export interface RenderRequest {
 	simplify?: boolean;
 	timeout?: number;
 	viewport?: Viewport;
+	outputMinimalText?: boolean;
 }
 
 export interface Screenshot {
@@ -43,7 +44,7 @@ export interface Screenshot {
 }
 
 export interface RenderResponse {
-	html: string;
+	output: string;
 	finalUrl: string;
 	screenshot?: Screenshot;
 }
@@ -65,6 +66,7 @@ export function renderRouter(browserPool: BrowserPool, semaphore: Semaphore, con
 				simplify: req.body.simplify,
 				timeout: req.body.timeout,
 				viewport: req.body.viewport,
+				outputMinimalText: req.body.outputMinimalText,
 			};
 			if (typeof renderRequest.url !== 'string' || renderRequest.url.trim() === '') {
 				throw new Error('Invalid or empty url');
@@ -77,16 +79,16 @@ export function renderRouter(browserPool: BrowserPool, semaphore: Semaphore, con
 			if (testDir && /^[0-9]{3}\.html$/.test(renderRequest.url)) {
 				const testPath = path.join(testDir, renderRequest.url);
 				try {
-					const html = await fs.readFile(testPath, 'utf8');
+					const output = await fs.readFile(testPath, 'utf8');
 					let result: RenderResponse = {
-						html,
+						output,
 						finalUrl: renderRequest.url,
 					};
 					if (renderRequest.simplify) {
-						const pass1 = cleanHtml(result.html);
+						const pass1 = cleanHtml(result.output, !!renderRequest.outputMinimalText);
 						result = {
 							...result,
-							html: pass1.html,
+							output: pass1.output,
 						};
 					}
 					res.json(result);
@@ -133,7 +135,7 @@ export function renderRouter(browserPool: BrowserPool, semaphore: Semaphore, con
 				}
 				await page.waitForTimeout(1000);
 				return {
-					html: await page.content(),
+					output: await page.content(),
 					finalUrl: page.url(),
 				};
 			})();
@@ -158,10 +160,10 @@ export function renderRouter(browserPool: BrowserPool, semaphore: Semaphore, con
 			let result = await withHardTimeout(task, config.hardTimeoutMs, hardTimeout);
 
 			if (renderRequest.simplify) {
-				const pass1 = cleanHtml(result.html);
+				const pass1 = cleanHtml(result.output, !!renderRequest.outputMinimalText);
 				result = {
 					...result,
-					html: pass1.html,
+					output: pass1.output,
 				};
 			}
 
@@ -208,11 +210,12 @@ function normalizeViewport(vp?: Viewport): Viewport {
 	};
 }
 
-function cleanHtml(html: string): PageCleaningResult {
+function cleanHtml(html: string, outputMinimalText: boolean): PageCleaningResult {
 	return cleanHtmlForLLM(html, nodeDomAdapter, {
 		allowedTags: new Set(RECIPE_MINIMAL_TAGS),
 		keepTables: false,
 		dropMedia: true,
+		outputMinimalText,
 	});
 }
 

@@ -66,5 +66,5 @@ Use this to create test files or check what would the renderer make out of a giv
 Make sure the server is running locally!
 
 ```bash
-curl -s -X POST http://localhost:3000/render -d '{"url":"https://recipes.site/yummy","simplify":false}' -H "Content-Type: application/json" | jq -r .html > testdata/001.html
+curl -s -X POST http://localhost:3000/render -d '{"url":"https://recipes.site/yummy","simplify":false}' -H "Content-Type: application/json" | jq -r .output > testdata/001.html
 ```

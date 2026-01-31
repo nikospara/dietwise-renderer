@@ -23,6 +23,8 @@ Options:
   --max-depth <number>                 Max nodes to process (default: 200000)
   --apply-consent-ui-heuristics | --no-apply-consent-ui-heuristics
                                        Try to remove consent UI (default: true)
+  --output-minimal-text | --no-output-minimal-text
+                                       Output minimal text, not HTML (default: false)
   -h, --help                           Show this help
 
 Examples:
@@ -139,6 +141,16 @@ function parseArgs(argv: string[]): CliResult {
 		}
 		if (arg === '--no-apply-consent-ui-heuristics') {
 			options.applyConsentUiHeuristics = false;
+			continue;
+		}
+
+		if (arg === '--output-minimal-text' || arg.startsWith('--output-minimal-text=')) {
+			const value = arg.includes('=') ? arg.split('=', 2)[1] : undefined;
+			options.outputMinimalText = parseBoolean(value, '--output-minimal-text');
+			continue;
+		}
+		if (arg === '--no-output-minimal-text') {
+			options.outputMinimalText = false;
 			continue;
 		}
 
