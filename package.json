@@ -12,6 +12,7 @@
     "start": "node dist/server.js",
     "lint": "eslint",
     "format": "prettier . --write",
+    "clean:html": "tsx scripts/clean-html-for-llm.ts",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:unit": "vitest run",
