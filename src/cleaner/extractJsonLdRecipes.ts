@@ -41,7 +41,7 @@ function findJsonLdRecipes(doc: Document): SchemaRecipe[] {
 function addIfRecipe(node: Graph | SchemaRecipe, recipes: SchemaRecipe[]) {
 	if (!node || typeof node !== 'object') return;
 	const context = (node as WithContext<Thing>)['@context'];
-	if (typeof context === 'string' && context !== 'https://schema.org' && context !== 'https://schema.org/') return;
+	if (!isSchemaOrgContext(context)) return;
 	const type = normalizeType((node as SchemaRecipe)['@type']);
 	if (type.includes('Recipe')) recipes.push(node as SchemaRecipe);
 	// Some sites nest Recipe inside @graph
@@ -55,6 +55,30 @@ function addIfRecipe(node: Graph | SchemaRecipe, recipes: SchemaRecipe[]) {
 	if (Array.isArray(node)) {
 		for (const n of node) addIfRecipe(n, recipes);
 	}
+}
+
+function isSchemaOrgContext(context: WithContext<Thing>['@context']): boolean {
+	if (!context) return true;
+	const isSchemaOrgString = (value: unknown) =>
+		typeof value === 'string' &&
+		(value === 'https://schema.org' ||
+			value === 'https://schema.org/' ||
+			value === 'http://schema.org' ||
+			value === 'http://schema.org/');
+	if (isSchemaOrgString(context)) return true;
+	if (Array.isArray(context)) {
+		return (context as unknown[]).some((entry) => {
+			if (isSchemaOrgString(entry)) return true;
+			if (entry && typeof entry === 'object') {
+				return isSchemaOrgString((entry as { '@vocab'?: unknown })['@vocab']);
+			}
+			return false;
+		});
+	}
+	if (context && typeof context === 'object') {
+		return isSchemaOrgString((context as { '@vocab'?: unknown })['@vocab']);
+	}
+	return false;
 }
 
 function normalizeType(t: unknown): string[] {
