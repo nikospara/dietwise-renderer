@@ -115,9 +115,61 @@ function normalizeJsonLdRecipe(r: SchemaRecipe): Recipe {
 	return {
 		name: r.name?.toString(),
 		recipeYield: r.recipeYield?.toString(),
-		recipeIngredients: Array.isArray(r.recipeIngredient) ? r.recipeIngredient.map(cleanText) : [],
+		recipeIngredients: normalizeRecipeIngredients(r.recipeIngredient),
 		recipeInstructions: flattenInstructions(r.recipeInstructions),
 	};
+}
+
+function normalizeRecipeIngredients(ingredients: SchemaRecipe['recipeIngredient']): string[] {
+	if (!ingredients) return [];
+	if (Array.isArray(ingredients)) {
+		return ingredients.map(normalizeRecipeIngredientItem).filter((item): item is string => item.length > 0);
+	}
+	const single = normalizeRecipeIngredientItem(ingredients);
+	return single ? [single] : [];
+}
+
+function normalizeRecipeIngredientItem(item: SchemaRecipe['recipeIngredient']): string {
+	if (!item) return '';
+	if (typeof item === 'string') return cleanText(item);
+	if (typeof item !== 'object') return cleanText(String(item));
+	return ingredientFromRole(item) || ingredientFromNamedObject(item) || ingredientFromUnknownObject(item);
+}
+
+function ingredientFromRole(item: unknown): string {
+	if (!item || typeof item !== 'object') return '';
+	const record = item as Record<string, unknown>;
+	const type = normalizeType(record['@type']);
+	if (type.includes('Role') || 'recipeIngredient' in record) {
+		const value = record['recipeIngredient'];
+		if (typeof value === 'string') return cleanText(value);
+		if (Array.isArray(value)) {
+			const parts = value.map((entry) =>
+				normalizeRecipeIngredientItem(entry as SchemaRecipe['recipeIngredient']),
+			);
+			return cleanText(parts.filter((part) => part.length > 0).join(' '));
+		}
+		if (value && typeof value === 'object') return ingredientFromNamedObject(value);
+	}
+	return '';
+}
+
+function ingredientFromNamedObject(item: unknown): string {
+	if (!item || typeof item !== 'object') return '';
+	const record = item as Record<string, unknown>;
+	const text = record['text'];
+	if (typeof text === 'string') return cleanText(text);
+	const name = record['name'];
+	if (typeof name === 'string') return cleanText(name);
+	return '';
+}
+
+function ingredientFromUnknownObject(item: unknown): string {
+	if (!item || typeof item !== 'object') return '';
+	const record = item as Record<string, unknown>;
+	const id = record['@id'];
+	if (typeof id === 'string') return cleanText(id);
+	return cleanText(String(item));
 }
 
 function flattenInstructions(instructions: RecipeInstructions): string[] {
