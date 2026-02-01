@@ -1,5 +1,5 @@
 import { parseHTML } from 'linkedom';
-import type { HtmlToDocumentAdapter } from './cleanHtmlForLLM.js';
+import type { HtmlToDocumentAdapter } from './HtmlToDocumentAdapter.js';
 
 export const nodeDomAdapter: HtmlToDocumentAdapter = {
 	parse(html: string): Document {

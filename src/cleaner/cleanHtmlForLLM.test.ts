@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 
 import { describe, it, expect } from 'vitest';
-import { cleanHtmlForLLM, HtmlToDocumentAdapter, DEFAULT_ALLOWED_TAGS } from './cleanHtmlForLLM.js';
+import { cleanHtmlForLLM, DEFAULT_ALLOWED_TAGS } from './cleanHtmlForLLM.js';
+import { HtmlToDocumentAdapter } from './HtmlToDocumentAdapter.js';
 import { nodeDomAdapter } from './nodeDomAdapter.js';
 import fs from 'node:fs';
 import path from 'node:path';

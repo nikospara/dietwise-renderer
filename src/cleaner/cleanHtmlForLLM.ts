@@ -16,6 +16,7 @@
 import { documentToMinimalText } from './htmlToMinimalText.js';
 import { getBodyElement } from './getBodyElement.js';
 import { removeConsentUI } from './removeConsentUI.js';
+import { HtmlToDocumentAdapter } from './HtmlToDocumentAdapter.js';
 
 export interface CleanOptions {
 	/** Allowed tags that will be preserved; all others are unwrapped (children kept). */
@@ -32,10 +33,6 @@ export interface CleanOptions {
 	applyConsentUiHeuristics: boolean;
 	/** Output minimal text (see `htmlToMinimalText). */
 	outputMinimalText: boolean;
-}
-
-export interface DomAdapter {
-	parse(html: string): Document;
 }
 
 export const DEFAULT_ALLOWED_TAGS: ReadonlySet<string> = new Set([
@@ -84,11 +81,6 @@ export interface PageCleaningResult {
 	output: string;
 	textLength: number;
 	stats: Record<string, number>;
-}
-
-/** Adapter so this can parse HTML in browser or server. */
-export interface HtmlToDocumentAdapter {
-	parse(html: string): Document;
 }
 
 export function cleanHtmlForLLM(

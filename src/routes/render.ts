@@ -9,6 +9,7 @@ import type { BrowserContext, Page } from 'playwright';
 import { withHardTimeout } from 'app/util/withHardTimeout.js';
 import { cleanHtmlForLLM, PageCleaningResult, RECIPE_MINIMAL_TAGS } from 'app/cleaner/cleanHtmlForLLM.js';
 import { nodeDomAdapter } from 'app/cleaner/nodeDomAdapter.js';
+import { extractJsonLdRecipesFromString, Recipe } from 'app/cleaner/extractJsonLdRecipes.js';
 
 export const CANONICAL_PROFILE = {
 	userAgent:
@@ -31,6 +32,7 @@ export interface Viewport {
 export interface RenderRequest {
 	url: string;
 	simplify?: boolean;
+	includeJsonLdRecipes: boolean;
 	timeout?: number;
 	viewport?: Viewport;
 	outputMinimalText?: boolean;
@@ -45,6 +47,7 @@ export interface Screenshot {
 
 export interface RenderResponse {
 	output: string;
+	jsonLdRecipes?: Recipe[];
 	finalUrl: string;
 	screenshot?: Screenshot;
 }
@@ -64,6 +67,7 @@ export function renderRouter(browserPool: BrowserPool, semaphore: Semaphore, con
 			const renderRequest: RenderRequest = {
 				url: req.body.url,
 				simplify: req.body.simplify,
+				includeJsonLdRecipes: req.body.includeJsonLdRecipes,
 				timeout: req.body.timeout,
 				viewport: req.body.viewport,
 				outputMinimalText: req.body.outputMinimalText,
@@ -84,6 +88,9 @@ export function renderRouter(browserPool: BrowserPool, semaphore: Semaphore, con
 						output,
 						finalUrl: renderRequest.url,
 					};
+					if (renderRequest.includeJsonLdRecipes) {
+						result.jsonLdRecipes = extractJsonLdRecipesFromString(output, nodeDomAdapter);
+					}
 					if (renderRequest.simplify) {
 						const pass1 = cleanHtml(result.output, !!renderRequest.outputMinimalText);
 						result = {
@@ -159,6 +166,9 @@ export function renderRouter(browserPool: BrowserPool, semaphore: Semaphore, con
 
 			let result = await withHardTimeout(task, config.hardTimeoutMs, hardTimeout);
 
+			if (renderRequest.includeJsonLdRecipes) {
+				result.jsonLdRecipes = extractJsonLdRecipesFromString(result.output, nodeDomAdapter);
+			}
 			if (renderRequest.simplify) {
 				const pass1 = cleanHtml(result.output, !!renderRequest.outputMinimalText);
 				result = {

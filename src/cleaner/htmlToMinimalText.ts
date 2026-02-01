@@ -1,4 +1,4 @@
-import type { HtmlToDocumentAdapter } from './cleanHtmlForLLM.js';
+import { HtmlToDocumentAdapter } from './HtmlToDocumentAdapter.js';
 import { getBodyElement } from './getBodyElement.js';
 
 export interface MinimalTextOptions {
