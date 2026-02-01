@@ -38,7 +38,7 @@ function findJsonLdRecipes(doc: Document): SchemaRecipe[] {
 	return recipes;
 }
 
-function addIfRecipe(node: Graph | SchemaRecipe, recipes: SchemaRecipe[]) {
+function addIfRecipe(node: unknown, recipes: SchemaRecipe[]) {
 	if (!node || typeof node !== 'object') return;
 	const context = (node as WithContext<Thing>)['@context'];
 	if (!isSchemaOrgContext(context)) return;
@@ -52,8 +52,32 @@ function addIfRecipe(node: Graph | SchemaRecipe, recipes: SchemaRecipe[]) {
 			if (t.includes('Recipe')) recipes.push(g);
 		}
 	}
+	addNestedIfRecipe(node, recipes);
 	if (Array.isArray(node)) {
 		for (const n of node) addIfRecipe(n, recipes);
+	}
+}
+
+function addNestedIfRecipe(node: unknown, recipes: SchemaRecipe[]) {
+	if (!node || typeof node !== 'object') return;
+	const record = node as Record<string, unknown>;
+	const keys = [
+		'mainEntity',
+		'mainEntityOfPage',
+		'hasPart',
+		'subjectOf',
+		'about',
+		'itemListElement',
+		'itemList',
+		'isPartOf',
+	];
+	for (const key of keys) {
+		const value = record[key];
+		if (Array.isArray(value)) {
+			for (const entry of value) addIfRecipe(entry, recipes);
+		} else if (value && typeof value === 'object') {
+			addIfRecipe(value, recipes);
+		}
 	}
 }
 
