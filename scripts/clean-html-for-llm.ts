@@ -31,6 +31,9 @@ Examples:
   tsx scripts/clean-html-for-llm.ts ./page.html
   tsx scripts/clean-html-for-llm.ts ./page.html --allowed-tags recipe-minimal
   tsx scripts/clean-html-for-llm.ts ./page.html --keep-tables --no-drop-media
+
+  Convert all htmls under testdata to simple texts:
+  for f in \`ls testdata/0{0,1}?.html\`; do tsx scripts/clean-html-for-llm.ts $f --output-minimal-text | jq -r .output > \${f%.html}.md; done
 `;
 	process.stdout.write(help);
 }

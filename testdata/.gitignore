@@ -4,3 +4,4 @@
 # while IFS=$'\t' read -r FILE URL ARGS; do ./scripts/download.sh $URL > testdata/$FILE; done < testdata/_control.csv
 #
 *.html
+*.md
