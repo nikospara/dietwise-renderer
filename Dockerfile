@@ -1,20 +1,24 @@
+# syntax=docker/dockerfile:1.7
+# Build stage
 FROM node:20-bookworm-slim AS build
 
 WORKDIR /app
 
 COPY package.json package-lock.json ./
-RUN npm ci
+RUN --mount=type=cache,target=/root/.npm npm ci
 
 COPY tsconfig.json ./
 COPY src ./src
 RUN npm run build
 
+# Runtime stage
 FROM node:20-bookworm-slim AS runtime
 
 WORKDIR /app
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 
 COPY package.json package-lock.json ./
-RUN npm ci
+RUN --mount=type=cache,target=/root/.npm npm ci
 
 # Install only Chromium and its system dependencies to keep the image smaller.
 RUN ./node_modules/.bin/playwright install chromium --with-deps \
