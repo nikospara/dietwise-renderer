@@ -16,5 +16,6 @@ function postprocess() {
 	fi
 }
 
-tsx scripts/clean-html-for-llm.ts testdata/$1 --output-minimal-text | jq "{pageContent: .output} | . += {\"langCode\": \"en\", \"url\":\"x\"}" | curl -s --json @- http://localhost:8180/api/v1/recipe/assess/markdown \
+tsx scripts/clean-html-for-llm.ts testdata/$1 --output-minimal-text | jq "{pageContent: .output} | . += {\"langCode\": \"en\", \"url\":\"x\"}" \
+| curl -s --json @- http://localhost:8180/api/v1/recipe/assess/markdown \
 | postprocess $2
