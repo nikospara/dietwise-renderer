@@ -32,6 +32,15 @@ export const CANONICAL_PROFILE = {
 	hasTouch: false,
 };
 
+const MINIMAL_REQUEST_HEADER_NAMES = new Set([
+	'accept',
+	'accept-language',
+	'content-type',
+	'origin',
+	'range',
+	'user-agent',
+]);
+
 export interface Viewport {
 	width: number;
 	height: number;
@@ -123,11 +132,114 @@ export function renderRouter(browserPool: BrowserPool, semaphore: Semaphore, con
 			const task: Promise<RenderResponse> = (async () => {
 				context = await browser.newContext({
 					...CANONICAL_PROFILE,
+					acceptDownloads: false,
+					extraHTTPHeaders: {
+						'Accept-Language': 'en-US,en;q=0.9',
+					},
+					serviceWorkers: 'block',
 					viewport: normalizeViewport(renderRequest.viewport),
 					recordHar: {
 						path: `/tmp/dietwise-renderer/${now}.har`,
 						content: 'embed',
 					},
+				});
+				await context.clearPermissions();
+				await context.addInitScript(() => {
+					const clearBrowserState = () => {
+						try {
+							window.localStorage.clear();
+						} catch (_) {
+							// Intentionally blank
+						}
+						try {
+							window.sessionStorage.clear();
+						} catch (_) {
+							// Intentionally blank
+						}
+						void indexedDB
+							.databases?.()
+							.then((databases) =>
+								Promise.all(
+									databases
+										.map((database) => database.name)
+										.filter((name): name is string => typeof name === 'string')
+										.map((name) => indexedDB.deleteDatabase(name)),
+								),
+							)
+							.catch(() => undefined);
+						void caches
+							?.keys()
+							.then((keys) => Promise.all(keys.map((key) => caches.delete(key))))
+							.catch(() => undefined);
+					};
+
+					clearBrowserState();
+					window.addEventListener('beforeunload', clearBrowserState);
+
+					const denied = 'denied';
+					const notAllowed = (name: string) =>
+						Object.assign(new Error(`${name} is disabled in this browser context`), {
+							name: 'NotAllowedError',
+						});
+
+					if ('Notification' in window) {
+						Object.defineProperty(Notification, 'permission', {
+							configurable: true,
+							get: () => denied,
+						});
+						Notification.requestPermission = async () => denied;
+					}
+
+					if ('geolocation' in navigator) {
+						const geolocationError = () => {
+							throw notAllowed('Geolocation');
+						};
+						navigator.geolocation.getCurrentPosition = ((success, error) => {
+							error?.({
+								code: 1,
+								message: 'Geolocation is disabled in this browser context',
+								PERMISSION_DENIED: 1,
+								POSITION_UNAVAILABLE: 2,
+								TIMEOUT: 3,
+							});
+							if (!error) geolocationError();
+						}) as Geolocation['getCurrentPosition'];
+						navigator.geolocation.watchPosition = ((success, error) => {
+							error?.({
+								code: 1,
+								message: 'Geolocation is disabled in this browser context',
+								PERMISSION_DENIED: 1,
+								POSITION_UNAVAILABLE: 2,
+								TIMEOUT: 3,
+							});
+							if (!error) geolocationError();
+							return 0;
+						}) as Geolocation['watchPosition'];
+					}
+
+					if ('mediaDevices' in navigator && navigator.mediaDevices) {
+						navigator.mediaDevices.getUserMedia = async () => {
+							throw notAllowed('getUserMedia');
+						};
+						navigator.mediaDevices.getDisplayMedia = async () => {
+							throw notAllowed('getDisplayMedia');
+						};
+					}
+
+					if ('clipboard' in navigator && navigator.clipboard) {
+						navigator.clipboard.read = async () => {
+							throw notAllowed('Clipboard read');
+						};
+						navigator.clipboard.readText = async () => {
+							throw notAllowed('Clipboard readText');
+						};
+						navigator.clipboard.write = async () => {
+							throw notAllowed('Clipboard write');
+						};
+						navigator.clipboard.writeText = async () => {
+							throw notAllowed('Clipboard writeText');
+						};
+					}
 				});
 				const cachedLookup = createCachedLookup();
 				await context.route('**/*', async (route) => {
@@ -146,13 +258,23 @@ export function renderRouter(browserPool: BrowserPool, semaphore: Semaphore, con
 
 					try {
 						await validateBrowserRequestUrl(request.url(), cachedLookup);
-						await route.continue();
+						await route.continue({
+							headers: minimalizeRequestHeaders(request.headers()),
+						});
 					} catch (err) {
 						console.warn(`Blocked outbound request from ${url} to ${request.url()}`, err);
 						await route.abort('blockedbyclient');
 					}
 				});
 				page = await context.newPage();
+				page.on('download', async (download) => {
+					console.warn(`Blocked download from ${url} to ${download.url()}`);
+					try {
+						await download.cancel();
+					} catch (err) {
+						console.warn(`Failed to cancel blocked download from ${download.url()}`, err);
+					}
+				});
 				page.on('console', (msg) => {
 					console.log(`[PAGE LOG] [${url}] ${msg.type()}: ${msg.text()}`);
 				});
@@ -238,6 +360,7 @@ export function renderRouter(browserPool: BrowserPool, semaphore: Semaphore, con
 
 async function closeContext(c: BrowserContext) {
 	try {
+		await c.clearCookies();
 		await c.close();
 	} catch (e) {
 		console.warn('Caught error while closing context', e);
@@ -290,4 +413,15 @@ function createCachedLookup(): HostLookup {
 		}
 		return resultPromise;
 	};
+}
+
+function minimalizeRequestHeaders(headers: Record<string, string>): Record<string, string> {
+	const filteredHeaders = Object.fromEntries(
+		Object.entries(headers).filter(([name]) => MINIMAL_REQUEST_HEADER_NAMES.has(name.toLowerCase())),
+	);
+
+	delete filteredHeaders.cookie;
+	delete filteredHeaders.referer;
+
+	return filteredHeaders;
 }
