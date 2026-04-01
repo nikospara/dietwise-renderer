@@ -1,6 +1,6 @@
 {
   "name": "dietwise-renderer",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "The web page renderer internal component of DietWise; it renders recipe pages on behalf of the mobile app",
   "license": "ISC",
   "author": "",
