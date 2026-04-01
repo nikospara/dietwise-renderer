@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { InvalidRenderTargetError, validateRemoteRenderUrl, validateRenderTarget } from 'app/routes/renderTarget.js';
+import {
+	InvalidRenderTargetError,
+	validateBrowserRequestUrl,
+	validateRemoteRenderUrl,
+	validateRenderTarget,
+} from 'app/routes/renderTarget.js';
 
 describe('validateRenderTarget', () => {
 	it('allows test fixture names only when they match the strict regex and test dir is configured', async () => {
@@ -62,5 +67,22 @@ describe('validateRemoteRenderUrl', () => {
 		await expect(validateRemoteRenderUrl('https://example.com/path?q=1', lookup)).resolves.toBe(
 			'https://example.com/path?q=1',
 		);
+	});
+});
+
+describe('validateBrowserRequestUrl', () => {
+	it('allows browser-local non-network URLs', async () => {
+		await expect(validateBrowserRequestUrl('about:blank')).resolves.toBe('about:blank');
+		await expect(validateBrowserRequestUrl('data:text/plain,hello')).resolves.toBe('data:text/plain,hello');
+		await expect(validateBrowserRequestUrl('blob:https://example.com/id')).resolves.toBe(
+			'blob:https://example.com/id',
+		);
+	});
+
+	it('rejects unsupported request protocols', async () => {
+		await expect(validateBrowserRequestUrl('file:///tmp/test.html')).rejects.toBeInstanceOf(
+			InvalidRenderTargetError,
+		);
+		await expect(validateBrowserRequestUrl('javascript:alert(1)')).rejects.toBeInstanceOf(InvalidRenderTargetError);
 	});
 });

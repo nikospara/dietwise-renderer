@@ -34,6 +34,29 @@ export interface RenderTargetValidationOptions {
 	lookup?: HostLookup;
 }
 
+export async function validateBrowserRequestUrl(
+	rawUrl: string,
+	lookupImpl: HostLookup = defaultLookup,
+): Promise<string> {
+	const candidate = rawUrl.trim();
+	let parsed: URL;
+
+	try {
+		parsed = new URL(candidate);
+	} catch {
+		throw new InvalidRenderTargetError('Request URL must be an absolute URL');
+	}
+
+	if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+		return validateRemoteRenderUrl(candidate, lookupImpl);
+	}
+	if (parsed.protocol === 'about:' || parsed.protocol === 'blob:' || parsed.protocol === 'data:') {
+		return candidate;
+	}
+
+	throw new InvalidRenderTargetError(`Blocked URL protocol: ${parsed.protocol}`);
+}
+
 export async function validateRenderTarget(
 	rawUrl: string,
 	options: RenderTargetValidationOptions = {},
@@ -52,7 +75,7 @@ export async function validateRenderTarget(
 
 	return {
 		kind: 'remote',
-		url: await validateRemoteRenderUrl(candidate, options.lookup),
+		url: await validateBrowserRequestUrl(candidate, options.lookup),
 	};
 }
 

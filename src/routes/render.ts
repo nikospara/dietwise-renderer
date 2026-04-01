@@ -1,5 +1,6 @@
 import type { Router } from 'express';
 import { Router as createRouter } from 'express';
+import { lookup as dnsLookup } from 'node:dns/promises';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import type { BrowserPool } from 'app/util/BrowserPool.js';
@@ -10,7 +11,13 @@ import { withHardTimeout } from 'app/util/withHardTimeout.js';
 import { cleanHtmlForLLM, PageCleaningResult, RECIPE_MINIMAL_TAGS } from 'app/cleaner/cleanHtmlForLLM.js';
 import { nodeDomAdapter } from 'app/cleaner/nodeDomAdapter.js';
 import { extractJsonLdRecipesFromString, Recipe } from 'app/cleaner/extractJsonLdRecipes.js';
-import { InvalidRenderTargetError, validateRemoteRenderUrl, validateRenderTarget } from 'app/routes/renderTarget.js';
+import {
+	HostLookup,
+	InvalidRenderTargetError,
+	validateBrowserRequestUrl,
+	validateRemoteRenderUrl,
+	validateRenderTarget,
+} from 'app/routes/renderTarget.js';
 
 export const CANONICAL_PROFILE = {
 	userAgent:
@@ -121,6 +128,16 @@ export function renderRouter(browserPool: BrowserPool, semaphore: Semaphore, con
 						path: `/tmp/dietwise-renderer/${now}.har`,
 						content: 'embed',
 					},
+				});
+				const cachedLookup = createCachedLookup();
+				await context.route('**/*', async (route) => {
+					try {
+						await validateBrowserRequestUrl(route.request().url(), cachedLookup);
+						await route.continue();
+					} catch (err) {
+						console.warn(`Blocked outbound request from ${url} to ${route.request().url()}`, err);
+						await route.abort('blockedbyclient');
+					}
 				});
 				page = await context.newPage();
 				page.on('console', (msg) => {
@@ -246,4 +263,18 @@ function isNetworkError(message: string): boolean {
 		message.includes('EHOSTUNREACH') ||
 		message.includes('ENETUNREACH')
 	);
+}
+
+function createCachedLookup(): HostLookup {
+	const cache = new Map<string, Promise<{ address: string; family: number }[]>>();
+
+	return async (hostname, options) => {
+		const cacheKey = hostname.toLowerCase();
+		let resultPromise = cache.get(cacheKey);
+		if (!resultPromise) {
+			resultPromise = dnsLookup(hostname, options);
+			cache.set(cacheKey, resultPromise);
+		}
+		return resultPromise;
+	};
 }
