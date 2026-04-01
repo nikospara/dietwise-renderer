@@ -10,6 +10,7 @@ import { withHardTimeout } from 'app/util/withHardTimeout.js';
 import { cleanHtmlForLLM, PageCleaningResult, RECIPE_MINIMAL_TAGS } from 'app/cleaner/cleanHtmlForLLM.js';
 import { nodeDomAdapter } from 'app/cleaner/nodeDomAdapter.js';
 import { extractJsonLdRecipesFromString, Recipe } from 'app/cleaner/extractJsonLdRecipes.js';
+import { InvalidRenderTargetError, validateRemoteRenderUrl, validateRenderTarget } from 'app/routes/renderTarget.js';
 
 export const CANONICAL_PROFILE = {
 	userAgent:
@@ -75,18 +76,18 @@ export function renderRouter(browserPool: BrowserPool, semaphore: Semaphore, con
 			if (typeof renderRequest.url !== 'string' || renderRequest.url.trim() === '') {
 				throw new Error('Invalid or empty url');
 			}
-			url = renderRequest.url;
 			const timeout = renderRequest.timeout || 15000;
 
-			// Test path: the environment variable DW_RENDERER_TEST_DIR points to a test directory and the requested URL is like 123.html
 			const testDir = process.env.DW_RENDERER_TEST_DIR;
-			if (testDir && /^[0-9]{3}\.html$/.test(renderRequest.url)) {
-				const testPath = path.join(testDir, renderRequest.url);
+			const renderTarget = await validateRenderTarget(renderRequest.url, { testDir });
+			if (renderTarget.kind === 'test') {
+				url = renderTarget.fileName;
+				const testPath = path.join(testDir ?? '', renderTarget.fileName);
 				try {
 					const output = await fs.readFile(testPath, 'utf8');
 					let result: RenderResponse = {
 						output,
-						finalUrl: renderRequest.url,
+						finalUrl: renderTarget.fileName,
 					};
 					if (renderRequest.includeJsonLdRecipes) {
 						result.jsonLdRecipes = extractJsonLdRecipesFromString(output, nodeDomAdapter);
@@ -109,7 +110,7 @@ export function renderRouter(browserPool: BrowserPool, semaphore: Semaphore, con
 				}
 			}
 
-			// Real path
+			url = renderTarget.url;
 			const browser = browserPool.acquire();
 
 			const task: Promise<RenderResponse> = (async () => {
@@ -128,7 +129,7 @@ export function renderRouter(browserPool: BrowserPool, semaphore: Semaphore, con
 				page.on('pageerror', (err) => {
 					console.error('[PAGE ERROR] [${url}]', err);
 				});
-				const response = await page.goto(url, {
+				const response = await page.goto(renderTarget.url, {
 					waitUntil: 'domcontentloaded',
 					timeout: timeout,
 				});
@@ -141,9 +142,10 @@ export function renderRouter(browserPool: BrowserPool, semaphore: Semaphore, con
 					}
 				}
 				await page.waitForTimeout(1000);
+				const finalUrl = await validateRemoteRenderUrl(page.url());
 				return {
 					output: await page.content(),
-					finalUrl: page.url(),
+					finalUrl,
 				};
 			})();
 
@@ -182,7 +184,8 @@ export function renderRouter(browserPool: BrowserPool, semaphore: Semaphore, con
 			console.error(`Error rendering ${url}`, err);
 			const errorMessage = String(err);
 			const hasHttpStatus = err && typeof err === 'object' && 'httpStatus' in err;
-			const responseStatus = hasHttpStatus || isNetworkError(errorMessage) ? 400 : 500;
+			const responseStatus =
+				hasHttpStatus || isNetworkError(errorMessage) || err instanceof InvalidRenderTargetError ? 400 : 500;
 			const httpStatus =
 				hasHttpStatus && typeof (err as { httpStatus?: unknown }).httpStatus === 'number'
 					? (err as { httpStatus: number }).httpStatus
