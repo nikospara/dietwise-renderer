@@ -131,11 +131,24 @@ export function renderRouter(browserPool: BrowserPool, semaphore: Semaphore, con
 				});
 				const cachedLookup = createCachedLookup();
 				await context.route('**/*', async (route) => {
+					const request = route.request();
+					if (
+						request.isNavigationRequest() &&
+						request.frame() === page?.mainFrame() &&
+						request.method() !== 'GET'
+					) {
+						console.warn(
+							`Blocked non-GET top-level navigation from ${url} to ${request.url()} (${request.method()})`,
+						);
+						await route.abort('blockedbyclient');
+						return;
+					}
+
 					try {
-						await validateBrowserRequestUrl(route.request().url(), cachedLookup);
+						await validateBrowserRequestUrl(request.url(), cachedLookup);
 						await route.continue();
 					} catch (err) {
-						console.warn(`Blocked outbound request from ${url} to ${route.request().url()}`, err);
+						console.warn(`Blocked outbound request from ${url} to ${request.url()}`, err);
 						await route.abort('blockedbyclient');
 					}
 				});
