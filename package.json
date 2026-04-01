@@ -27,23 +27,23 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.2",
-    "@nabla/vite-plugin-eslint": "^2.0.6",
+    "@nabla/vite-plugin-eslint": "^3.0.1",
     "@playwright/test": "^1.58.2",
     "@types/express": "^5.0.6",
-    "@types/node": "^25.2.3",
+    "@types/node": "^25.5.0",
     "eslint": "^9.39.2",
     "eslint-config-prettier": "^10.1.8",
     "eslint-import-resolver-typescript": "^4.4.4",
     "eslint-plugin-import": "^2.32.0",
     "eslint-plugin-prettier": "^5.5.5",
-    "jsdom": "^28.0.0",
+    "jsdom": "^29.0.1",
     "prettier": "^3.8.1",
-    "schema-dts": "^1.1.5",
+    "schema-dts": "^2.0.0",
     "tsc-alias": "^1.8.16",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
-    "typescript-eslint": "^8.55.0",
+    "typescript-eslint": "^8.57.2",
     "vite-tsconfig-paths": "^6.1.1",
-    "vitest": "^4.0.18"
+    "vitest": "^4.1.2"
   }
 }
