@@ -63,19 +63,7 @@ export const DEFAULT_ALLOWED_TAGS: ReadonlySet<string> = new Set([
 	'a',
 ]);
 
-// eslint-disable-next-line prettier/prettier
-export const TABLE_TAGS = [
-	'table',
-	'thead',
-	'tbody',
-	'tfoot',
-	'tr',
-	'th',
-	'td',
-	'caption',
-	'colgroup',
-	'col',
-] as const;
+export const TABLE_TAGS = ['table', 'thead', 'tbody', 'tfoot', 'tr', 'th', 'td', 'caption', 'colgroup', 'col'] as const;
 
 export interface PageCleaningResult {
 	output: string;
@@ -338,6 +326,7 @@ export function cleanDocumentForLLM(doc: Document, options?: Partial<CleanOption
 	// Restore <br> for explicit breaks in lists/paragraphs (optional). Keep HTML minimal.
 	// If you prefer pure text, skip this restore.
 	out = out.replace(/\n/g, '<br>');
+	out = out.replace(/\s*<br>\s*/g, '<br>');
 
 	// 6) Final pass: remove accidental empty wrappers again
 	out = out
