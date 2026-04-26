@@ -6,7 +6,7 @@ export default defineConfig({
 	fullyParallel: true,
 	reporter: [['list']],
 	use: {
-		baseUrl: 'http://127.0.0.1:3000'
+		baseURL: 'http://127.0.0.1:3000',
 	},
 	webServer: {
 		command: 'npm run dev',
