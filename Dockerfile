@@ -5,7 +5,7 @@ FROM node:22-bookworm-slim AS build
 WORKDIR /app
 
 COPY package.json package-lock.json ./
-RUN --mount=type=cache,target=/root/.npm npm ci
+RUN --mount=type=cache,target=/root/.npm npm i -g npm@11 && npm ci
 
 COPY tsconfig.json ./
 COPY src ./src
@@ -18,7 +18,7 @@ WORKDIR /app
 ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 
 COPY package.json package-lock.json ./
-RUN --mount=type=cache,target=/root/.npm npm ci
+RUN --mount=type=cache,target=/root/.npm npm i -g npm@11 && npm ci
 
 # Install only Chromium and its system dependencies to keep the image smaller.
 RUN ./node_modules/.bin/playwright install chromium --with-deps \
